@@ -1,0 +1,564 @@
+# ********************************
+# SUDOKU SOLVER
+#   in Python
+# by Abigail Hindman
+# Nov  21, 2020 - Jan 29, 2021
+# ********************************
+
+# note: to fix "term environment not set error" right click project - modify run config in more debug options and
+# select emulate terminal in output console option
+# array notes for 2-D - first down row, then right column; always start at zero
+# array notes for 3-D - first in layer, then down row, then right column; always start at zero
+
+import math
+import os
+import numpy as np
+from termcolor import colored
+
+
+def clear():
+    os.system("clear")
+
+
+def print_sudoku_puzzle(p_b, maxrows, cycles):  # Function to print the sudoku puzzle
+    sym = list(map(str, ["-", "1", "2", "3", "4", "5", "6", "7", "8", "9"]))
+    clr = list(map(str, ["magenta", "blue", "blue", "blue", "blue", "blue", "blue", "blue", "blue", "blue"]))
+    print()
+    if cycles > 0:
+        print("Loop #", cycles, "\n")
+    for rownum in range(maxrows):
+        if rownum % 3 == 0:
+            print("        ", colored('-------------------------------------', 'yellow'))
+        i = rownum
+        print("        ", colored('| ', 'yellow'), colored(sym[p_b[i][0]], clr[p_b[i][0]]), "",
+              colored(sym[p_b[i][1]], clr[p_b[i][1]]), "", colored(sym[p_b[i][2]], clr[p_b[i][2]]), "",
+              colored('| ', 'yellow'), colored(sym[p_b[i][3]], clr[p_b[i][3]]), "",
+              colored(sym[p_b[i][4]], clr[p_b[i][4]]), "", colored(sym[p_b[i][5]], clr[p_b[i][5]]), "",
+              colored('| ', 'yellow'), colored(sym[p_b[i][6]], clr[p_b[i][6]]), "",
+              colored(sym[p_b[i][7]], clr[p_b[i][7]]), "", colored(sym[p_b[i][8]], clr[p_b[i][8]]), "",
+              colored('|', 'yellow'))
+    print("        ", colored('-------------------------------------', 'yellow'))
+
+
+def get_board_by_row(flag):  # accept the puzzle board as rows from the player
+    pz_bd = np.zeros((max_rows, max_rows), dtype=int)
+    for rownum in range(9):
+        j = rownum + 1
+        try:
+            puzzle_row = list(map(int, input("Enter Row #" + str(j) + ":   ").split()))  # Accept input for the row
+        except ValueError:
+            print(colored("valerror", 'red'))
+            flag = 1
+            continue
+        if len(puzzle_row) != 9:  # Check if nine numbers were entered
+            print(colored("not nine long", 'red'))
+            flag = 1
+        for x in puzzle_row:
+            if x < 0 or x > 9:  # Check if each number entered corresponds to a number
+                print(colored(x, 'red'), colored(" not an integer within 0 to 9", 'red'))
+                flag = 1
+        if flag == 1:
+            break
+        pz_bd[rownum] = puzzle_row
+    return pz_bd
+
+
+def get_a_puzzle():    # Input the sample puzzle board
+    mx_rws = 9
+    sample_board_1 = [[0, 6, 0, 4, 0, 0, 0, 9, 1],
+                      [0, 9, 0, 1, 3, 8, 7, 0, 0],
+                      [7, 4, 0, 6, 2, 0, 0, 8, 0],
+                      [0, 8, 4, 0, 0, 1, 6, 3, 0],
+                      [6, 7, 9, 0, 0, 0, 0, 0, 2],
+                      [3, 0, 0, 0, 0, 6, 0, 4, 7],
+                      [0, 0, 8, 9, 0, 3, 5, 7, 6],
+                      [4, 0, 6, 5, 1, 0, 0, 0, 0],
+                      [9, 5, 0, 8, 6, 0, 0, 0, 3]]
+
+    sample_board_2 = [[0, 0, 0, 7, 9, 0, 0, 3, 4],
+                      [0, 7, 0, 0, 2, 0, 0, 9, 0],
+                      [0, 8, 0, 0, 0, 0, 2, 0, 0],
+                      [0, 1, 0, 0, 0, 0, 3, 2, 0],
+                      [0, 0, 2, 0, 0, 0, 4, 0, 6],
+                      [0, 0, 7, 3, 0, 0, 0, 0, 5],
+                      [0, 9, 6, 0, 8, 4, 0, 0, 0],
+                      [2, 0, 0, 5, 0, 6, 0, 0, 0],
+                      [0, 0, 0, 0, 3, 0, 0, 0, 8]]
+
+    sample_board_99 = [[3, 0, 0, 1, 0, 0, 0, 0, 4],
+                       [0, 0, 0, 0, 0, 0, 0, 9, 0],
+                       [0, 0, 2, 0, 0, 9, 0, 3, 0],
+                       [1, 0, 0, 2, 0, 0, 7, 0, 0],
+                       [0, 0, 3, 0, 0, 0, 8, 0, 0],
+                       [0, 0, 8, 0, 0, 6, 0, 0, 1],
+                       [0, 1, 0, 4, 0, 0, 2, 0, 0],
+                       [0, 5, 0, 0, 0, 0, 0, 0, 0],
+                       [4, 0, 0, 0, 0, 7, 0, 0, 8]]
+
+    sample_board_100 = [[4, 6, 0, 0, 0, 1, 0, 0, 0],
+                        [0, 0, 2, 0, 9, 6, 0, 0, 0],
+                        [0, 3, 0, 0, 0, 0, 0, 6, 8],
+                        [0, 0, 0, 0, 0, 0, 0, 3, 7],
+                        [0, 0, 0, 6, 0, 7, 0, 0, 0],
+                        [5, 1, 0, 0, 0, 0, 0, 0, 0],
+                        [8, 4, 0, 0, 0, 0, 0, 5, 0],
+                        [0, 0, 0, 7, 1, 0, 9, 0, 0],
+                        [0, 0, 0, 3, 0, 0, 0, 2, 4]]
+
+    print(colored("\n* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *", 'green'))
+    print(colored("          Welcome to Abigail's Sudoku Solver!", 'blue'))
+    print("\n        Input a puzzle. ", colored("Use '0' for blank cells.", 'red'))
+    print(colored('Example INPUT:', 'green'), "to create the row below ->",
+          colored('  '.join(map(str, sample_board_1[0][:])), 'green'), "\n")
+    print("        ", colored('-------------------------------------', 'yellow'))
+    print("        ", colored('| ', 'yellow'), colored('  '.join(map(str, sample_board_1[0][:3])), 'green'),
+          colored(' | ', 'yellow'),
+          colored('  '.join(map(str, sample_board_1[0][3:6])), 'green'), colored(' | ', 'yellow'),
+          colored('  '.join(map(str, sample_board_1[0][6:])), 'green'), colored(' |', 'yellow'))
+    print("        ", colored('-------------------------------------', 'yellow'))
+    print(colored("\n* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *", 'green'))
+
+    puzz_bd = np.zeros((mx_rws, mx_rws), dtype=int)
+    try:
+        use_sample = input(
+            "\nTo use the sample puzzle (0 = Get by Row, 1 = Easy, 2 = Moderate, 99 = Hard, 100 = Extreme): ")
+        use_sample = int(use_sample)
+        if use_sample == 1:
+            puzz_bd = sample_board_1
+        elif use_sample == 2:
+            puzz_bd = sample_board_2
+        elif use_sample == 99:
+            puzz_bd = sample_board_99
+        elif use_sample == 0:
+            puzz_bd = get_board_by_row(use_sample)
+        elif use_sample == 100:
+            puzz_bd = sample_board_100
+    finally:
+        return puzz_bd
+
+
+# ********************************
+#  START MAIN PROGRAM
+# ********************************
+
+max_rows = 9
+puzzle_board = get_a_puzzle()
+
+print("* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *")
+print(colored("                     Puzzle as Entered", 'blue'))
+print_sudoku_puzzle(puzzle_board, max_rows, 0)
+sqr_data = np.zeros([max_rows, max_rows], dtype=int)
+layers_of_board = np.zeros((max_rows, max_rows, max_rows), dtype=int)
+sqr_layers_of_board = np.zeros((max_rows, max_rows, max_rows), dtype=int)
+count = 0
+in_a_row = 0
+max_tries = 20
+start_board = np.zeros((max_rows, max_rows), dtype=int)
+change_made = True
+for count in range(max_tries):  # This is the loop to solve the puzzle
+    if not change_made:
+        in_a_row += 1
+    if in_a_row > 2:
+        print(colored("I cannot find more changes... at loop # ", 'red'), colored(count, 'red'),
+              colored(".  Better luck next time!!!", "red"))
+        print("layer: \n", layers_of_board, "\n")
+        print("sqr: \n", sqr_layers_of_board)
+        break
+    start_board = puzzle_board
+    change_made = False
+
+    for i in range(max_rows):  # makes a 1x9 array of the nine squares
+        sqr_row = []
+        x_adj = 3 * (i % 3)
+        y_adj = 3 * math.trunc(i / 3)
+        x_end = 3 + x_adj
+        sqr_row.append(start_board[y_adj][x_adj:x_end])
+        y_adj += 1
+        sqr_row.append(start_board[y_adj][x_adj:x_end])
+        y_adj += 1
+        sqr_row.append(start_board[y_adj][x_adj:x_end])
+        sqr_data[i] = np.reshape(sqr_row, max_rows)
+        continue
+
+    for num in range(max_rows):  # create layers of board for each number; 0 = open; 99 = complete;
+        for row in range(max_rows):  # -1 = impossible for this number (e.g., filled in row, column)
+            for col in range(max_rows):
+                nn = 1 + num
+                if start_board[row][col] == nn:
+                    layers_of_board[num, 0:row, col] = -1
+                    layers_of_board[num, 1 + row:max_rows, col] = -1
+                    layers_of_board[num, row, 0:col] = -1
+                    layers_of_board[num, row, 1 + col:max_rows] = -1
+                    layers_of_board[num, row, col] = 99
+                elif start_board[row][col] != 0:
+                    layers_of_board[num, row, col] = -1
+                elif start_board[row][col] == 0:
+                    which_sqr = 3 * math.trunc(row / 3) + math.trunc(col / 3)
+                    if nn in sqr_data[which_sqr]:
+                        layers_of_board[num, row, col] = -1
+                continue
+
+    for num in range(max_rows):  # create sqr_layers where rows are squares; 0 = open; 99 = complete;
+        for row in range(max_rows):  # -1 = impossible for this number (e.g., filled in square)
+            for col in range(max_rows):
+                which_sqr = 3 * math.trunc(row / 3) + math.trunc(col / 3)
+                ind_num = 3 * (row - 3 * math.trunc(row / 3)) + (col - 3 * math.trunc(col / 3))
+                sqr_layers_of_board[num, which_sqr, ind_num] = layers_of_board[num, row, col]
+
+    for num in range(max_rows):
+        for row in range(max_rows):
+            for col in range(max_rows):
+                nn = 1 + num
+                which_sqr = 3 * math.trunc(row / 3) + math.trunc(col / 3)
+                ind_num = 3 * (row - 3 * math.trunc(row / 3)) + (col - 3 * math.trunc(col / 3))
+                if layers_of_board[num, row, col] == 0:
+                    if np.sum(layers_of_board[num, row, :]) == -8 or np.sum(layers_of_board[num, :, col]) == -8 or \
+                            np.sum(sqr_layers_of_board[num, which_sqr, :]) == -8 or \
+                            np.sum(layers_of_board[:, row, col]) == -8:
+                        puzzle_board[row][col] = nn
+                        layers_of_board[num, row, col] = 99
+                        layers_of_board[num, 0:row, col] = -1
+                        layers_of_board[num, 1 + row:max_rows, col] = -1
+                        layers_of_board[num, row, 0:col] = -1
+                        layers_of_board[num, row, 1 + col:max_rows] = -1
+                        sqr_layers_of_board[num, which_sqr, ind_num] = 99
+                        sqr_layers_of_board[num, which_sqr, 0:ind_num] = -1
+                        sqr_layers_of_board[num, which_sqr, 1 + ind_num:max_rows] = -1
+                        change_made = True
+                    continue
+
+    for num in range(max_rows):
+        for j in range(max_rows):
+            which_sqr = j
+            first_col = 3 * (which_sqr % 3)
+            last_colplus = 1 + 2 + first_col
+            first_row = 3 * (math.trunc(which_sqr / 3))
+            last_rowplus = 1 + 2 + first_row
+            if np.sum(sqr_layers_of_board[num, which_sqr, :]) == -6:  # 3 zeros in square in a layer
+                if np.sum(sqr_layers_of_board[num, which_sqr, 0:3]) == 0:  # all 3 zeros in first row of square?
+                    layers_of_board[num, 3 * (math.trunc(which_sqr / 3)), :first_col] = -1
+                    layers_of_board[num, 3 * (math.trunc(which_sqr / 3)), last_colplus:] = -1
+                    sqr_layers_of_board[num, which_sqr, 3:] = -1
+                elif np.sum(sqr_layers_of_board[num, which_sqr, 3:6]) == 0:  # all 3 zeros in second row of square?
+                    layers_of_board[num, 1 + 3 * (math.trunc(which_sqr / 3)), :first_col] = -1
+                    layers_of_board[num, 1 + 3 * (math.trunc(which_sqr / 3)), last_colplus:] = -1
+                    sqr_layers_of_board[num, which_sqr, :3] = -1
+                    sqr_layers_of_board[num, which_sqr, 6:] = -1
+                elif np.sum(sqr_layers_of_board[num, which_sqr, 6:9]) == 0:  # all 3 zeros in third row of square?
+                    layers_of_board[num, 2 + 3 * (math.trunc(which_sqr / 3)), :first_col] = -1
+                    layers_of_board[num, 2 + 3 * (math.trunc(which_sqr / 3)), last_colplus:] = -1
+                    sqr_layers_of_board[num, which_sqr, :6] = -1
+                    continue
+                if sqr_layers_of_board[num, which_sqr, 0] + sqr_layers_of_board[num, which_sqr, 3] + \
+                        sqr_layers_of_board[num, which_sqr, 6] == 0:  # all 3 zeros in first column of square?
+                    layers_of_board[num, :first_row, 3 * (which_sqr % 3)] = -1
+                    layers_of_board[num, last_rowplus:, 3 * (which_sqr % 3)] = -1
+                    sqr_layers_of_board[num, which_sqr, 1:3] = -1
+                    sqr_layers_of_board[num, which_sqr, 4:6] = -1
+                    sqr_layers_of_board[num, which_sqr, 7:] = -1
+                elif sqr_layers_of_board[num, which_sqr, 1] + sqr_layers_of_board[num, which_sqr, 4] + \
+                        sqr_layers_of_board[num, which_sqr, 7] == 0:  # all 3 zeros in second column of square?
+                    layers_of_board[num, :first_row, 1 + 3 * (which_sqr % 3)] = -1
+                    layers_of_board[num, last_rowplus:, 1 + 3 * (which_sqr % 3)] = -1
+                    sqr_layers_of_board[num, which_sqr, 0] = -1
+                    sqr_layers_of_board[num, which_sqr, 2:4] = -1
+                    sqr_layers_of_board[num, which_sqr, 5:7] = -1
+                    sqr_layers_of_board[num, which_sqr, 8] = -1
+                elif sqr_layers_of_board[num, which_sqr, 2] + sqr_layers_of_board[num, which_sqr, 5] + \
+                        sqr_layers_of_board[num, which_sqr, 8] == 0:  # all 3 zeros in third column of square?
+                    layers_of_board[num, :first_row, 2 + 3 * (which_sqr % 3)] = -1
+                    layers_of_board[num, last_rowplus:, 2 + 3 * (which_sqr % 3)] = -1
+                    sqr_layers_of_board[num, which_sqr, :2] = -1
+                    sqr_layers_of_board[num, which_sqr, 3:5] = -1
+                    sqr_layers_of_board[num, which_sqr, 6:8] = -1
+                    continue
+            row = j
+            if np.sum(layers_of_board[num, row, :]) == -6:  # 3 zeros in row in a layer
+                if np.sum(layers_of_board[num, row, 0:3]) == 0:  # all 3 zeros in first column of squares?
+                    layers_of_board[num, row, 3:] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), 3:] = -1
+                        layers_of_board[num, row + 1, 0:3] = -1
+                        layers_of_board[num, row + 2, 0:3] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), :3] = -1
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), 6:] = -1
+                        layers_of_board[num, row + 1, 0:3] = -1
+                        layers_of_board[num, row - 1, 0:3] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), :6] = -1
+                        layers_of_board[num, row - 1, 0:3] = -1
+                        layers_of_board[num, row - 2, 0:3] = -1
+                elif np.sum(layers_of_board[num, row, 3:6]) == 0:  # all 3 zeros in second column of squares?
+                    layers_of_board[num, row, :3] = -1
+                    layers_of_board[num, row, 6:] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), 3:] = -1
+                        layers_of_board[num, row + 1, 3:6] = -1
+                        layers_of_board[num, row + 2, 3:6] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), :3] = -1
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), 6:] = -1
+                        layers_of_board[num, row + 1, 3:6] = -1
+                        layers_of_board[num, row - 1, 3:6] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), :6] = -1
+                        layers_of_board[num, row - 1, 3:6] = -1
+                        layers_of_board[num, row - 2, 3:6] = -1
+                elif np.sum(layers_of_board[num, row, 6:]) == 0:  # all 3 zeros in third column of squares?
+                    layers_of_board[num, row, :6] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), 3:] = -1
+                        layers_of_board[num, row + 1, 6:] = -1
+                        layers_of_board[num, row + 2, 6:] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), :3] = -1
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), 6:] = -1
+                        layers_of_board[num, row - 1, 6:] = -1
+                        layers_of_board[num, row + 1, 6:] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), :6] = -1
+                        layers_of_board[num, row - 1, 6:] = -1
+                        layers_of_board[num, row - 2, 6:] = -1
+                        continue
+            col = j
+            if np.sum(layers_of_board[num, :, col]) == -6:  # 3 zeros in col in a layer
+                if np.sum(layers_of_board[num, 0:3, col]) == 0:  # all 3 zeros in first row of squares?
+                    layers_of_board[num, 3:, col] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, math.trunc(col / 3), 1:3] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 4:6] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 7:] = -1
+                        layers_of_board[num, 0:3, col + 1] = -1
+                        layers_of_board[num, 0:3, col + 2] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, math.trunc(col / 3), 0] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 2:4] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 5:7] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 8] = -1
+                        layers_of_board[num, 0:3, col - 1] = -1
+                        layers_of_board[num, 0:3, col + 1] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, math.trunc(col / 3), :2] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 2:5] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 6:8] = -1
+                        layers_of_board[num, 0:3, col - 2] = -1
+                        layers_of_board[num, 0:3, col - 1] = -1
+                elif np.sum(layers_of_board[num, 3:6, col]) == 0:  # all 3 zeros in second row of squares?
+                    layers_of_board[num, :3, col] = -1
+                    layers_of_board[num, 6:, col] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 1:3] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 4:6] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 7:] = -1
+                        layers_of_board[num, 3:6, col + 1] = -1
+                        layers_of_board[num, 3:6, col + 2] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 0] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 2:4] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 5:7] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 8] = -1
+                        layers_of_board[num, 3:6, col - 1] = -1
+                        layers_of_board[num, 3:6, col + 1] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), :2] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 2:5] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 6:8] = -1
+                        layers_of_board[num, 3:6, col - 2] = -1
+                        layers_of_board[num, 3:6, col - 1] = -1
+                elif np.sum(layers_of_board[num, 6:, col]) == 0:  # all 3 zeros in third row of squares?
+                    layers_of_board[num, :6, col] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 1:3] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 4:6] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 7:] = -1
+                        layers_of_board[num, 6:, col + 1] = -1
+                        layers_of_board[num, 6:, col + 2] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 0] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 2:4] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 5:7] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 8] = -1
+                        layers_of_board[num, 6:, col - 1] = -1
+                        layers_of_board[num, 6:, col + 1] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), :2] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 2:5] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 6:8] = -1
+                        layers_of_board[num, 6:, col - 2] = -1
+                        layers_of_board[num, 6:, col - 1] = -1
+                        continue
+
+            if np.sum(sqr_layers_of_board[num, which_sqr, :]) == -7:  # 2 zeros in square in a layer
+                if np.sum(sqr_layers_of_board[num, which_sqr, 0:3]) == -1:  # Both zeros in first row of square?
+                    layers_of_board[num, 3 * (math.trunc(which_sqr / 3)), :first_col] = -1
+                    layers_of_board[num, 3 * (math.trunc(which_sqr / 3)), last_colplus:] = -1
+                    sqr_layers_of_board[num, which_sqr, 3:] = -1
+                elif np.sum(sqr_layers_of_board[num, which_sqr, 3:6]) == -1:  # Both zeros in second row of square?
+                    layers_of_board[num, 1 + 3 * (math.trunc(which_sqr / 3)), :first_col] = -1
+                    layers_of_board[num, 1 + 3 * (math.trunc(which_sqr / 3)), last_colplus:] = -1
+                    sqr_layers_of_board[num, which_sqr, :3] = -1
+                    sqr_layers_of_board[num, which_sqr, 6:] = -1
+                elif np.sum(sqr_layers_of_board[num, which_sqr, 6:9]) == -1:  # Both zeros in third row of square?
+                    layers_of_board[num, 2 + 3 * (math.trunc(which_sqr / 3)), :first_col] = -1
+                    layers_of_board[num, 2 + 3 * (math.trunc(which_sqr / 3)), last_colplus:] = -1
+                    sqr_layers_of_board[num, which_sqr, :6] = -1
+                    continue
+                if sqr_layers_of_board[num, which_sqr, 0] + sqr_layers_of_board[num, which_sqr, 3] + \
+                        sqr_layers_of_board[num, which_sqr, 6] == -1:  # Both zeros in first column of square?
+                    layers_of_board[num, :first_row, 3 * (which_sqr % 3)] = -1
+                    layers_of_board[num, last_rowplus:, 3 * (which_sqr % 3)] = -1
+                    sqr_layers_of_board[num, which_sqr, 1:3] = -1
+                    sqr_layers_of_board[num, which_sqr, 4:6] = -1
+                    sqr_layers_of_board[num, which_sqr, 7:] = -1
+                elif sqr_layers_of_board[num, which_sqr, 1] + sqr_layers_of_board[num, which_sqr, 4] + \
+                        sqr_layers_of_board[num, which_sqr, 7] == -1:  # Both zeros in second column of square?
+                    layers_of_board[num, :first_row, 1 + 3 * (which_sqr % 3)] = -1
+                    layers_of_board[num, last_rowplus:, 1 + 3 * (which_sqr % 3)] = -1
+                    sqr_layers_of_board[num, which_sqr, 0] = -1
+                    sqr_layers_of_board[num, which_sqr, 2:4] = -1
+                    sqr_layers_of_board[num, which_sqr, 5:7] = -1
+                    sqr_layers_of_board[num, which_sqr, 8] = -1
+                elif sqr_layers_of_board[num, which_sqr, 2] + sqr_layers_of_board[num, which_sqr, 5] + \
+                        sqr_layers_of_board[num, which_sqr, 8] == -1:  # Both zeros in third column of square?
+                    layers_of_board[num, :first_row, 2 + 3 * (which_sqr % 3)] = -1
+                    layers_of_board[num, last_rowplus:, 2 + 3 * (which_sqr % 3)] = -1
+                    sqr_layers_of_board[num, which_sqr, :2] = -1
+                    sqr_layers_of_board[num, which_sqr, 3:5] = -1
+                    sqr_layers_of_board[num, which_sqr, 6:8] = -1
+                continue
+
+            row = j
+            if np.sum(layers_of_board[num, row, :]) == -7:  # 2 zeros in row in a layer
+                if np.sum(layers_of_board[num, row, 0:3]) == -1:  # all 2 zeros in first column of squares?
+                    layers_of_board[num, row, 3:] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), 3:] = -1
+                        layers_of_board[num, row + 1, 0:3] = -1
+                        layers_of_board[num, row + 2, 0:3] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), :3] = -1
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), 6:] = -1
+                        layers_of_board[num, row + 1, 0:3] = -1
+                        layers_of_board[num, row - 1, 0:3] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 3 * math.trunc(row / 3), :6] = -1
+                        layers_of_board[num, row - 1, 0:3] = -1
+                        layers_of_board[num, row - 2, 0:3] = -1
+                elif np.sum(layers_of_board[num, row, 3:6]) == -1:  # all 2 zeros in second column of squares?
+                    layers_of_board[num, row, :3] = -1
+                    layers_of_board[num, row, 6:] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), 3:] = -1
+                        layers_of_board[num, row + 1, 3:6] = -1
+                        layers_of_board[num, row + 2, 3:6] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), :3] = -1
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), 6:] = -1
+                        layers_of_board[num, row + 1, 3:6] = -1
+                        layers_of_board[num, row - 1, 3:6] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 1 + 3 * math.trunc(row / 3), :6] = -1
+                        layers_of_board[num, row - 1, 3:6] = -1
+                        layers_of_board[num, row - 2, 3:6] = -1
+                elif np.sum(layers_of_board[num, row, 6:]) == -1:  # all 2 zeros in third column of squares?
+                    layers_of_board[num, row, :6] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), 3:] = -1
+                        layers_of_board[num, row + 1, 6:] = -1
+                        layers_of_board[num, row + 2, 6:] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), :3] = -1
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), 6:] = -1
+                        layers_of_board[num, row - 1, 6:] = -1
+                        layers_of_board[num, row + 1, 6:] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 2 + 3 * math.trunc(row / 3), :6] = -1
+                        layers_of_board[num, row - 1, 6:] = -1
+                        layers_of_board[num, row - 2, 6:] = -1
+                        continue
+            col = j
+            if np.sum(layers_of_board[num, :, col]) == -7:  # 2 zeros in col in a layer
+                if np.sum(layers_of_board[num, 0:3, col]) == -1:  # all 2 zeros in first row of squares?
+                    layers_of_board[num, 3:, col] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, math.trunc(col / 3), 1:3] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 4:6] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 7:] = -1
+                        layers_of_board[num, 0:3, col + 1] = -1
+                        layers_of_board[num, 0:3, col + 2] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, math.trunc(col / 3), 0] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 2:4] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 5:7] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 8] = -1
+                        layers_of_board[num, 0:3, col - 1] = -1
+                        layers_of_board[num, 0:3, col + 1] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, math.trunc(col / 3), :2] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 2:5] = -1
+                        sqr_layers_of_board[num, math.trunc(col / 3), 6:8] = -1
+                        layers_of_board[num, 0:3, col - 2] = -1
+                        layers_of_board[num, 0:3, col - 1] = -1
+                elif np.sum(layers_of_board[num, 3:6, col]) == -1:  # all 2 zeros in second row of squares?
+                    layers_of_board[num, :3, col] = -1
+                    layers_of_board[num, 6:, col] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 1:3] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 4:6] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 7:] = -1
+                        layers_of_board[num, 3:6, col + 1] = -1
+                        layers_of_board[num, 3:6, col + 2] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 0] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 2:4] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 5:7] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 8] = -1
+                        layers_of_board[num, 3:6, col - 1] = -1
+                        layers_of_board[num, 3:6, col + 1] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), :2] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 2:5] = -1
+                        sqr_layers_of_board[num, 3 + math.trunc(col / 3), 6:8] = -1
+                        layers_of_board[num, 3:6, col - 2] = -1
+                        layers_of_board[num, 3:6, col - 1] = -1
+                elif np.sum(layers_of_board[num, 6:, col]) == -1:  # all 2 zeros in third row of squares?
+                    layers_of_board[num, :6, col] = -1
+                    if j % 3 == 0:
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 1:3] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 4:6] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 7:] = -1
+                        layers_of_board[num, 6:, col + 1] = -1
+                        layers_of_board[num, 6:, col + 2] = -1
+                    elif j % 3 == 1:
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 0] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 2:4] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 5:7] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 8] = -1
+                        layers_of_board[num, 6:, col - 1] = -1
+                        layers_of_board[num, 6:, col + 1] = -1
+                    elif j % 3 == 2:
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), :2] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 2:5] = -1
+                        sqr_layers_of_board[num, 6 + math.trunc(col / 3), 6:8] = -1
+                        layers_of_board[num, 6:, col - 2] = -1
+                        layers_of_board[num, 6:, col - 1] = -1
+                        continue
+
+    print_sudoku_puzzle(puzzle_board, max_rows, count + 1)
+    if np.count_nonzero(puzzle_board) == max_rows ** 2:  # Check for no more zeros on puzzle board
+        if np.sum(puzzle_board) == 405:
+            print(colored("\n Puzzle Solved!! WE WIN!!!!", 'green'))
+        else:
+            print(colored("\n Something went wrong... check the results", 'red'))
+        break
+
+    count += 1
+
+if count == max_tries:  # Check for giving up
+    print_sudoku_puzzle(puzzle_board, max_rows, count)
+    print(colored("Could not solve within ", 'red'), colored(max_tries, 'red'),
+          colored(" loops.  Better luck next time!!!", 'red'))
+
+print()
+print("end")
